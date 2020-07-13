@@ -1,20 +1,30 @@
-import 'dart:collection';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/rendering.dart';
 import 'package:flutter_sliver_exposure/model/exposure_model.dart';
 
+/// Scrollable中仅包含一个SliverList或SliverGrid等元素时使用
+/// 返回滑动中可见元素下标范围和ScrollNotification
 typedef SingleScrollCallback = void Function(
     IndexRange range, ScrollNotification scrollNotification);
 
+/// Scrollable中包含多个Sliver元素时使用
+/// 返回滑动中可见元素下标范围和ScrollNotification
+/// 因为支持多section，所以返回的是List<IndexRange>
 typedef SliverScrollCallback = void Function(
     List<IndexRange>, ScrollNotification scrollNotification);
 
+/// 子元素开始曝光回调，返回子元素开始曝光的信息
 typedef ExposureStartCallback = void Function(ExposureStartIndex index);
 
+/// 子元素结束曝光回调，返回子元素结束曝光的信息
 typedef ExposureEndCallback = void Function(ExposureEndIndex index);
 
+/// 根据当前子节点元素的状态判断此子节点是否处于曝光状态
+/// [index]子节点位置信息，[paintExtent]子节点在屏幕中可见的范围
+/// [maxPaintExtent]子节点完全展示时的范围，如果将子节点完全
+/// 展示作为曝光的依据可返回 [paintExtent == maxPaintExtent]
 typedef ExposureReferee = bool Function(
     ExposureStartIndex index, double paintExtent, double maxPaintExtent);
 
@@ -194,19 +204,27 @@ class _SliverExposureListenerState extends State<SliverExposureListener>
   }
 
   bool _onNotification(ScrollNotification notice) {
+    // 记录当前曝光时间，可作为开始曝光元素的曝光开始时间点和结束曝光节点的结束曝光时间点
     final int exposureTime = DateTime.now().millisecondsSinceEpoch;
+    // 查找对应的Viewport节点MultiChildRenderObjectElement
     final viewPortElement =
         findElementByType<MultiChildRenderObjectElement>(notice.context);
     assert(viewPortElement != null);
+    // 定义parentIndex 用于确定外层节点位置，也作为SliverList或SlierGrid的parentIndex
     int parentIndex = 0;
     final indexRanges = <IndexRange>[];
+    // 保存上次完全可见的集合用于之后的结束曝光通知
     oldSet = Set.from(visibleSet);
+    // 每个节点前面所有节点所占的范围，用于SliverList或SliverGrid确定
+    // 自身在viewport中的可见区域
     double totalScrollExtent = 0;
     viewPortElement.visitChildElements((itemElement) {
       assert(itemElement.renderObject is RenderSliver);
       final geometry = (itemElement.renderObject as RenderSliver).geometry;
+      // 判断当前子节点时是否可见，不可见无须处理曝光
       if (geometry.visible) {
         if (itemElement is SliverMultiBoxAdaptorElement) {
+          // SliverList和SliverGrid进行子节点曝光判断
           final indexRange = _visitSliverMultiBoxAdaptorElement(
               itemElement,
               notice.metrics.pixels - totalScrollExtent,
@@ -218,6 +236,7 @@ class _SliverExposureListenerState extends State<SliverExposureListener>
           indexRanges.add(indexRange);
           _dispatchExposureStartEventByIndexRange(indexRange, exposureTime);
         } else {
+          // 单一RenderSlider直接判断外层节点是否曝光即可
           bool isExposure = widget.exposureReferee != null
               ? widget.exposureReferee(
                   ExposureStartIndex(parentIndex, 0, exposureTime),
@@ -234,7 +253,9 @@ class _SliverExposureListenerState extends State<SliverExposureListener>
       totalScrollExtent += geometry.scrollExtent;
       parentIndex++;
     });
+    // 根据上次曝光的元素集合找出当前已不可见的元素，进行曝光结束事件通过
     _dispatchExposureEndEvent(oldSet, exposureTime);
+    // 调用scrollCallback返回当前可见元素位置
     widget.scrollCallback?.call(indexRanges, notice);
     return false;
   }

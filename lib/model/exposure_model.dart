@@ -35,9 +35,10 @@ class ExposureEndIndex {
   // 曝光子节点下标
   final int itemIndex;
 
-  // 曝光开始事件
+  // 曝光结束事件
   final int exposureEndTime;
 
+  // 曝光时长
   final int exposureTime;
 
   ExposureEndIndex(this.parentIndex, this.itemIndex, this.exposureEndTime, this.exposureTime);
