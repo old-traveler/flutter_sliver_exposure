@@ -192,8 +192,6 @@ class ExposureDemo extends StatelessWidget {
       scrollDirection: axis,
       scrollCallback:
           (List<IndexRange> range, ScrollNotification scrollNotification) {
-//        globalKey.currentState
-//            .updateExposureTip(range, range.lastIndex);
       },
       exposureEndCallback: (ExposureEndIndex index) {
         print(
